@@ -9,6 +9,7 @@ from PIL import Image
 import openpyxl
 from docx import Document
 import pandas as pd
+import chardet
 
 app = FastAPI(title="Document Metadata Extractor", version="1.0.0")
 
@@ -16,6 +17,7 @@ SUPPORTED_TYPES = {
     'application/pdf': ['.pdf'],
     'application/vnd.ms-excel': ['.xls'],
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+    'text/csv': ['.csv'],
     'image/jpeg': ['.jpg', '.jpeg'],
     'image/png': ['.png'],
     'image/tiff': ['.tif', '.tiff'],
@@ -190,10 +192,64 @@ def process_docx(file_path: str) -> Dict[str, Any]:
             "error": str(e)
         }
 
+def process_csv(file_path: str) -> Dict[str, Any]:
+    """Process CSV file and extract metadata"""
+    try:
+        # Detect encoding
+        with open(file_path, 'rb') as f:
+            raw_data = f.read()
+            encoding_result = chardet.detect(raw_data)
+            encoding = encoding_result['encoding'] or 'utf-8'
+        
+        # Read CSV with pandas
+        df = pd.read_csv(file_path, encoding=encoding, nrows=1000)  # Limit to first 1000 rows
+        
+        text_content = f"=== CSV FILE ===\n"
+        text_content += f"COLUNAS: {' | '.join(df.columns.astype(str))}\n\n"
+        
+        # Add first 20 rows of data
+        for idx, row in df.head(20).iterrows():
+            row_text = " | ".join([str(val) if pd.notna(val) else "" for val in row])
+            text_content += f"Linha {idx + 1}: {row_text}\n"
+        
+        text_content += f"\n[Total: {len(df)} linhas, {len(df.columns)} colunas]"
+        
+        metadata = {
+            "document_type": "csv",
+            "page_count": 1,
+            "row_count": len(df),
+            "column_count": len(df.columns),
+            "columns": df.columns.tolist(),
+            "text_preview": text_content[:1500] + "..." if len(text_content) > 1500 else text_content,
+            "full_content": text_content,
+            "encoding": encoding,
+            "tables_count": 1,
+            "images_count": 0,
+            "structure_elements": ["CSV", "Data Table"]
+        }
+        return metadata
+        
+    except Exception as e:
+        return {
+            "document_type": "csv",
+            "page_count": 1,
+            "text_preview": f"CSV file (unable to read content): {str(e)}",
+            "tables_count": 0,
+            "images_count": 0,
+            "structure_elements": ["CSV"],
+            "error": str(e)
+        }
+
 def process_text(file_path: str) -> Dict[str, Any]:
     """Process text file and extract metadata"""
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        # Detect encoding
+        with open(file_path, 'rb') as f:
+            raw_data = f.read()
+            encoding_result = chardet.detect(raw_data)
+            encoding = encoding_result['encoding'] or 'utf-8'
+        
+        with open(file_path, 'r', encoding=encoding) as f:
             content = f.read()
         
         lines = content.split('\n')
@@ -203,6 +259,7 @@ def process_text(file_path: str) -> Dict[str, Any]:
             "line_count": len(lines),
             "character_count": len(content),
             "text_preview": content[:500] + "..." if len(content) > 500 else content,
+            "encoding": encoding,
             "tables_count": 0,
             "images_count": 0,
             "structure_elements": ["Text"]
@@ -226,6 +283,8 @@ def extract_metadata_for_prompt(file_path: str, mime_type: str) -> Dict[str, Any
         return process_pdf(file_path)
     elif mime_type in ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']:
         return process_excel(file_path)
+    elif mime_type == 'text/csv':
+        return process_csv(file_path)
     elif mime_type.startswith('image/'):
         return process_image(file_path)
     elif mime_type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
