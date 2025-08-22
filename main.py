@@ -207,8 +207,8 @@ def process_csv(file_path: str) -> Dict[str, Any]:
         text_content = f"=== CSV FILE ===\n"
         text_content += f"COLUNAS: {' | '.join(df.columns.astype(str))}\n\n"
         
-        # Add first 20 rows of data
-        for idx, row in df.head(20).iterrows():
+        # Add first 500 rows of data
+        for idx, row in df.head(500).iterrows():
             row_text = " | ".join([str(val) if pd.notna(val) else "" for val in row])
             text_content += f"Linha {idx + 1}: {row_text}\n"
         
