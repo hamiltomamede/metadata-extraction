@@ -42,7 +42,7 @@ def process_pdf(file_path: str) -> Dict[str, Any]:
     
     # Extract text from first few pages
     text_content = ""
-    for page_num in range(min(3, len(doc))):
+    for page_num in range(min(10, len(doc))):
         page = doc[page_num]
         text_content += page.get_text()
         
@@ -65,10 +65,10 @@ def process_excel(file_path: str) -> Dict[str, Any]:
         excel_file = pd.ExcelFile(file_path)
         sheet_names = excel_file.sheet_names
         
-        # Extract content from each sheet (limit to first 3 sheets and first 100 rows per sheet)
+        # Extract content from each sheet (limit to first 3 sheets and first 500 rows per sheet)
         for sheet_name in sheet_names[:3]:
             try:
-                df = pd.read_excel(file_path, sheet_name=sheet_name, nrows=100)
+                df = pd.read_excel(file_path, sheet_name=sheet_name, nrows=500)
                 total_rows += len(df)
                 
                 # Add sheet header
@@ -77,8 +77,8 @@ def process_excel(file_path: str) -> Dict[str, Any]:
                 # Add column headers
                 text_content += "COLUNAS: " + " | ".join(df.columns.astype(str)) + "\n\n"
                 
-                # Add first few rows of data
-                for idx, row in df.head(20).iterrows():
+                # Add first 500 rows of data
+                for idx, row in df.head(500).iterrows():
                     row_text = " | ".join([str(val) if pd.notna(val) else "" for val in row])
                     text_content += f"Linha {idx + 1}: {row_text}\n"
                 
@@ -100,14 +100,14 @@ def process_excel(file_path: str) -> Dict[str, Any]:
                 ws = wb[sheet_name]
                 text_content += f"\n=== PLANILHA: {sheet_name} ===\n"
                 
-                # Get data from first 50 rows and 20 columns
+                # Get data from first 500 rows and 50 columns
                 rows_data = []
-                for row in ws.iter_rows(max_row=50, max_col=20, values_only=True):
+                for row in ws.iter_rows(max_row=500, max_col=50, values_only=True):
                     row_text = " | ".join([str(cell) if cell is not None else "" for cell in row])
                     if row_text.strip():  # Only add non-empty rows
                         rows_data.append(row_text)
                 
-                text_content += "\n".join(rows_data[:30])  # First 30 non-empty rows
+                text_content += "\n".join(rows_data[:500])  # First 500 non-empty rows
                 text_content += f"\n\n[Planilha {sheet_name} processada]\n"
             
             wb.close()
@@ -166,7 +166,7 @@ def process_docx(file_path: str) -> Dict[str, Any]:
         text_content = ""
         table_count = 0
         
-        for paragraph in doc.paragraphs[:10]:  # First 10 paragraphs
+        for paragraph in doc.paragraphs[:500]:  # First 500 paragraphs
             text_content += paragraph.text + "\n"
         
         table_count = len(doc.tables)
